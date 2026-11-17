@@ -1,0 +1,20 @@
+{
+  "max_flow": {
+    "nombre": "Flujo Máximo (Sumatoria de salida)",
+    "descripcion": "Suma del flujo que sale desde el nodo fuente hacia sus vecinos.",
+    "latex": "\\sum_{v \\in V} f(s, v) - \\sum_{u \\in V} f(u, s) = \\text{Val}(f)",
+    "sympy_expr": "Sum(f(s, v), (v, V))"
+  },
+  "capacity_constraint": {
+    "nombre": "Restricción de Capacidad",
+    "descripcion": "El flujo en cada arista no puede superar su capacidad máxima y debe ser no negativo.",
+    "latex": "0 \\le f(u, v) \\le c(u, v)",
+    "sympy_expr": "0 <= f(u, v) <= c(u, v)"
+  },
+  "flow_conservation": {
+    "nombre": "Conservación de Flujo",
+    "descripcion": "Para cualquier nodo intermedio, el flujo que entra es igual al que sale.",
+    "latex": "\\sum_{u \\in V} f(u, z) = \\sum_{w \\in V} f(z, w)",
+    "sympy_expr": "Sum(f(u, z), (u, V)) - Sum(f(z, w), (w, V)) == 0"
+  }
+}
