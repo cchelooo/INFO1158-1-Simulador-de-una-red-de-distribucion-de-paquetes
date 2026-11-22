@@ -17,6 +17,12 @@ Modificar la capacidad de una ruta.
 Agregar una nueva conexión
 ```
 
+### Abrir el simulador
+
+Usa Python 3 con Tkinter y ejecuta `python3 -B interfaz.py` desde la carpeta del proyecto. Puedes probar si tu Python trae Tkinter con `python3 -m tkinter`. El calculo usa solo Python y Tkinter se usa para la ventana.
+
+La red inicial tiene 10 centros (`A` a `J`) y 16 rutas. Cada terna de `RUTAS_INICIALES` en `red.py` guarda el centro de salida, el de llegada y los paquetes por hora que admite la ruta. Dos caminos de `A` a `J` son `A -> B -> D -> E -> H -> J` y `A -> C -> F -> G -> I -> J`.
+
 ### Probar el flujo máximo y el corte mínimo
 
 Desde la raíz del repositorio, ejecutar `python3 -B flujo.py` para calcular el flujo de `A` a `J` en la red inicial. La salida muestra el flujo y la capacidad de cada ruta, los conjuntos `S` y `T`, los arcos del corte y su capacidad total.
@@ -43,3 +49,17 @@ El origen es `O` y el destino es `J`. Las capacidades y los flujos están en paq
 **Corte.** Con `S = {O, A, B, C}` y `T = {J}`, cruzan las rutas `B → J` y `C → J`. La capacidad del corte es `1 + 1 = 2`. Este corte pone un límite superior de 2 y el flujo construido alcanza ese límite, así que ambos resultados son óptimos.
 
 El código obtiene los mismos flujos, la misma partición y la misma capacidad. Para comprobarlo, ejecutar `python3 -B -m unittest -v test_flujo`.
+
+### Comparar las tres redes
+
+Usa `A` como origen y `J` como destino. Calcula la red inicial, apaga `A -> B` y calcula de nuevo. Luego pulsa **Restablecer red**, cambia la capacidad de `A -> C` a 12 y vuelve a calcular.
+
+| Red | Flujo maximo y capacidad del corte | S | T | Rutas del corte |
+| --- | ---: | --- | --- | --- |
+| Inicial | 14 | A | B, C, D, E, F, G, H, I, J | A -> B (8), A -> C (6) |
+| Con A -> B apagada | 6 | A | B, C, D, E, F, G, H, I, J | A -> C (6) |
+| Con A -> C en 12 | 16 | A, B, C, D, E, F, G, H | I, J | F -> I (4), G -> I (3), H -> J (7), E -> I (2) |
+
+Al apagar `A -> B`, todos los paquetes salen por `A -> C`, que admite 6. Al subir `A -> C` de 6 a 12, el flujo sube de 14 a 16 porque las rutas mas cerca del destino pasan a ser el limite.
+
+`python3 -B -m unittest discover -v` comprueba que en cada una de las tres redes se respetan las capacidades, entra y sale lo mismo en los centros intermedios y el flujo maximo coincide con la capacidad del corte.

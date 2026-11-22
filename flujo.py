@@ -2,9 +2,9 @@ from red import CENTROS_INICIALES, RUTAS_INICIALES, Red
 
 
 def _buscar_anteriores(residual, origen, destino):
-    # La busqueda en anchura sigue arcos con capacidad residual positiva
-    # Guarda el centro anterior de cada centro alcanzado desde el origen
-    # Si el destino es inalcanzable la busqueda recorre todo el lado del origen
+    # Busca desde el origen por donde todavia queda espacio
+    # Guarda de donde llegamos a cada centro para armar el camino
+    # Si no llega al destino guarda todos los centros que alcanzo
     anteriores = {origen: None}
     cola = [origen]
     indice = 0
@@ -20,7 +20,7 @@ def _buscar_anteriores(residual, origen, destino):
 
 
 def _reconstruir_camino(anteriores, origen, destino):
-    # Sigue los centros anteriores y devuelve los arcos de origen a destino
+    # Va del destino al origen y luego pone el camino en orden
     camino = []
     centro = destino
     while centro != origen:
@@ -52,21 +52,21 @@ def calcular_flujo_y_corte(red, origen, destino):
             break
 
         camino = _reconstruir_camino(anteriores, origen, destino)
-        # El menor espacio disponible limita lo que puede aumentar el flujo
+        # La ruta con menos espacio dice cuanto podemos mandar
         aumento = min(residual[inicio][fin] for inicio, fin in camino)
         for inicio, fin in camino:
             residual[inicio][fin] -= aumento
-            # El arco residual inverso permite deshacer parte de este paso
+            # Dejamos la opcion de mover ese flujo a otro camino despues
             residual[fin][inicio] += aumento
         valor += aumento
 
-    # En una ruta original, el flujo es la capacidad inicial menos la libre
+    # Restamos el espacio que quedo libre para saber cuanto paso
     flujos = {
         (inicio, fin): capacidad - residual[inicio][fin]
         for (inicio, fin), capacidad in capacidades.items()
     }
 
-    # La ultima busqueda alcanza todos los centros del lado del origen
+    # Los centros de la ultima busqueda quedan del lado del origen
     lado_origen = set(anteriores)
     lado_destino = set(red.centros) - lado_origen
     arcos_corte = {

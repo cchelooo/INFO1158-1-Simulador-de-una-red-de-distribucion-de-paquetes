@@ -20,10 +20,21 @@ class Red:
             raise ValueError("La ruta ya existe.")
         if (destino, origen) in self._capacidades:
             raise ValueError("La red no admite rutas reciprocas.")
+        self._validar_capacidad(capacidad)
+        self._capacidades[(origen, destino)] = capacidad
+
+    @staticmethod
+    def _validar_capacidad(capacidad):
         if type(capacidad) is not int or not 1 <= capacidad <= 12:
             raise ValueError("La capacidad debe ser un entero entre 1 y 12.")
 
-        self._capacidades[(origen, destino)] = capacidad
+    def modificar_capacidad(self, origen, destino, capacidad):
+        # Cambia cuantos paquetes admite la ruta y deja igual su estado
+        arco = (origen, destino)
+        if arco not in self._capacidades:
+            raise ValueError("La ruta no existe.")
+        self._validar_capacidad(capacidad)
+        self._capacidades[arco] = capacidad
 
     # Quita una ruta de los recorridos disponibles y conserva su capacidad
     def desactivar_ruta(self, origen, destino):
@@ -31,6 +42,17 @@ class Red:
         if arco not in self._capacidades:
             raise ValueError("La ruta no existe.")
         self._desactivadas.add(arco)
+
+    def reactivar_ruta(self, origen, destino):
+        # Vuelve a abrir una ruta con la capacidad que ya tenia
+        arco = (origen, destino)
+        if arco not in self._capacidades:
+            raise ValueError("La ruta no existe.")
+        self._desactivadas.discard(arco)
+
+    def rutas(self):
+        # Incluye las rutas apagadas para que se puedan dibujar en la ventana
+        return self._capacidades.copy()
 
     # Devuelve un diccionario con cada arco activo y su capacidad
     def rutas_activas(self):
