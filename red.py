@@ -1,5 +1,5 @@
 class Red:
-    # Recibe centros y rutas en el formato (origen, destino, capacidad).
+    # Recibe centros y rutas en el formato (origen, destino, capacidad)
     def __init__(self, centros, rutas=()):
         self.centros = tuple(centros)
         if len(set(self.centros)) != len(self.centros):
@@ -10,7 +10,7 @@ class Red:
         for origen, destino, capacidad in rutas:
             self.agregar_ruta(origen, destino, capacidad)
 
-    # Registra una nueva ruta activa si cumple las reglas de la red.
+    # Registra una nueva ruta activa si cumple las reglas de la red
     def agregar_ruta(self, origen, destino, capacidad):
         if origen not in self.centros or destino not in self.centros:
             raise ValueError("Los dos centros deben pertenecer a la red.")
@@ -25,14 +25,14 @@ class Red:
 
         self._capacidades[(origen, destino)] = capacidad
 
-    # Quita una ruta de los recorridos disponibles y conserva su capacidad.
+    # Quita una ruta de los recorridos disponibles y conserva su capacidad
     def desactivar_ruta(self, origen, destino):
         arco = (origen, destino)
         if arco not in self._capacidades:
             raise ValueError("La ruta no existe.")
         self._desactivadas.add(arco)
 
-    # Devuelve un diccionario con cada arco activo y su capacidad.
+    # Devuelve un diccionario con cada arco activo y su capacidad
     def rutas_activas(self):
         return {
             arco: capacidad
@@ -40,8 +40,8 @@ class Red:
             if arco not in self._desactivadas
         }
 
-    # Comprueba las condiciones iniciales del proyecto para el par elegido.
-    # Si alguna no se cumple, indica el problema mediante ValueError.
+    # Comprueba las condiciones iniciales del proyecto para el par elegido
+    # Si alguna no se cumple, indica el problema mediante ValueError
     def validar_configuracion_inicial(self, origen, destino):
         if origen not in self.centros or destino not in self.centros:
             raise ValueError("Los dos centros deben pertenecer a la red.")
@@ -62,7 +62,7 @@ class Red:
         if len(centros_conectados) != len(self.centros):
             raise ValueError("La red inicial no puede tener centros aislados.")
 
-        # Explora caminos dirigidos y se detiene al encontrar dos distintos.
+        # Explora caminos dirigidos y se detiene al encontrar dos distintos
         pendientes = [(origen,)]
         encontrados = 0
         while pendientes:
@@ -82,8 +82,8 @@ class Red:
 
 
 def clasificar_recorrido(red, secuencia):
-    # Recibe una red y una secuencia de centros. Devuelve True o False
-    # para cada categoria que puede cumplir la secuencia.
+    # Recibe una red y una secuencia de centros
+    # Devuelve un valor booleano para cada categoria de la secuencia
     vertices = tuple(secuencia)
     arcos = list(zip(vertices, vertices[1:]))
     rutas = red.rutas_activas()
@@ -98,8 +98,8 @@ def clasificar_recorrido(red, secuencia):
     cerrado = recorrido and vertices[0] == vertices[-1]
     circuito = sendero and cerrado
 
-    # Un circuito puede tener longitud cero. Un ciclo requiere tres arcos
-    # como minimo y solo puede repetir el centro donde se cierra.
+    # Un circuito puede tener longitud cero
+    # Un ciclo requiere tres arcos como minimo y solo repite el centro del cierre
     ciclo = (
         cerrado
         and len(arcos) >= 3
@@ -115,7 +115,7 @@ def clasificar_recorrido(red, secuencia):
     }
 
 
-# Centros y capacidades de la red de demostracion de la rama Martin.
+# Centros y capacidades de la red de demostracion de la rama Martin
 CENTROS_INICIALES = ("A", "B", "C", "D", "E", "F", "G", "H", "I", "J")
 RUTAS_INICIALES = (
     ("A", "B", 8),
@@ -138,7 +138,7 @@ RUTAS_INICIALES = (
 
 
 def _mostrar_clasificacion(red, secuencia):
-    # Imprime las categorias que cumple una secuencia para la demostracion.
+    # Imprime las categorias que cumple una secuencia para la demostracion
     resultado = clasificar_recorrido(red, secuencia)
     categorias = [nombre for nombre, cumple in resultado.items() if cumple]
     print(" -> ".join(secuencia), "|", ", ".join(categorias) or "recorrido invalido")
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     print("\nDespues de desactivar A -> B:")
     _mostrar_clasificacion(red, ("A", "B", "D"))
 
-    # Los dos triangulos dirigidos permiten comparar un ciclo y un circuito.
+    # Los dos triangulos dirigidos permiten comparar un ciclo y un circuito
     red_ejemplo = Red(
         ("A", "B", "C", "D", "E"),
         (
