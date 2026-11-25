@@ -54,6 +54,8 @@ El código obtiene los mismos flujos, la misma partición y la misma capacidad. 
 
 Usa `A` como origen y `J` como destino. Calcula la red inicial, apaga `A -> B` y calcula de nuevo. Luego pulsa **Restablecer red**, cambia la capacidad de `A -> C` a 12 y vuelve a calcular.
 
+Pulsa **Guardar escenario** despues de cada calculo. Con **Comparar escenarios** puedes ver el flujo, la capacidad del corte y los cambios de las tres redes en la misma tabla.
+
 | Red | Flujo maximo y capacidad del corte | S | T | Rutas del corte |
 | --- | ---: | --- | --- | --- |
 | Inicial | 14 | A | B, C, D, E, F, G, H, I, J | A -> B (8), A -> C (6) |

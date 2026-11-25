@@ -1,6 +1,6 @@
 import math
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import font, messagebox, ttk
 
 from flujo import calcular_flujo_y_corte
 from red import CENTROS_INICIALES, RUTAS_INICIALES, Red
@@ -10,14 +10,14 @@ FONDO = "#101827"
 PANEL = "#1E293B"
 TEXTO = "#FFFFFF"
 SECUNDARIO = "#A8B3C7"
-COLOR_CORTE = "#FDBA74"
+COLOR_CORTE = "#F59E0B"
 COLOR_INACTIVA = "#F87171"
 
-# Dibujo de Martin con espacio entre el centro G y la flecha de E a H
+# Posiciones del dibujo actualizado de Martin
 POSICIONES = {
     "A": (0.08, 0.50), "B": (0.28, 0.25), "C": (0.28, 0.75),
-    "D": (0.47, 0.15), "E": (0.47, 0.40), "F": (0.47, 0.85),
-    "G": (0.67, 0.42), "H": (0.84, 0.20), "I": (0.67, 0.75),
+    "D": (0.47, 0.15), "E": (0.47, 0.32), "F": (0.47, 0.85),
+    "G": (0.67, 0.46), "H": (0.82, 0.12), "I": (0.67, 0.75),
     "J": (0.92, 0.55),
 }
 
@@ -29,6 +29,8 @@ class Interfaz:
         self.red.validar_configuracion_inicial("A", "J")
         self.flujos = None
         self.corte = None
+        self.escenarios = []
+        self.comparacion = None
 
         ventana.title("Simulador de distribución de paquetes")
         ventana.geometry("1200x700")
@@ -87,6 +89,12 @@ class Interfaz:
             resultados, textvariable=self.texto_corte, bg=PANEL, fg=TEXTO,
             justify="left", wraplength=235,
         ).pack(anchor="w", pady=(0, 12))
+        ttk.Button(
+            resultados, text="Guardar escenario", command=self.guardar_escenario,
+        ).pack(fill="x", pady=(0, 4))
+        ttk.Button(
+            resultados, text="Comparar escenarios", command=self.comparar_escenarios,
+        ).pack(fill="x", pady=(0, 10))
 
         marco_tabla = tk.Frame(resultados, bg=PANEL)
         marco_tabla.pack(fill="both", expand=True)
@@ -141,18 +149,20 @@ class Interfaz:
                 return
 
             arco = (inicio, fin)
-            rutas = self.red.rutas()
             try:
-                if arco in rutas and arco not in self.red.rutas_activas():
+                nueva_capacidad = int(capacidad.get())
+                if arco in self.red.rutas() and arco not in self.red.rutas_activas():
                     confirmar = messagebox.askyesno(
-                        "Ruta inactiva", f"¿Reactivar {inicio} → {fin} con capacidad {rutas[arco]}?",
+                        "Ruta inactiva",
+                        f"¿Reactivar {inicio} → {fin} con capacidad {nueva_capacidad}?",
                         parent=dialogo,
                     )
                     if not confirmar:
                         return
+                    self.red.modificar_capacidad(inicio, fin, nueva_capacidad)
                     self.red.reactivar_ruta(inicio, fin)
                 else:
-                    self.red.agregar_ruta(inicio, fin, int(capacidad.get()))
+                    self.red.agregar_ruta(inicio, fin, nueva_capacidad)
             except ValueError as error:
                 messagebox.showerror("Ruta inválida", str(error), parent=dialogo)
                 return
@@ -182,20 +192,28 @@ class Interfaz:
         self._boton_dialogo(dialogo, "Guardar cambios", guardar)
 
     def desactivar_ruta(self):
-        arcos = list(self.red.rutas_activas())
-        if not arcos:
+        activas = self.red.rutas_activas()
+        if not activas:
             messagebox.showinfo("Rutas", "Ya no quedan rutas activas", parent=self.ventana)
             return
 
         dialogo = self._dialogo("Desactivar ruta")
-        ruta = self._selector(dialogo, "Ruta", [f"{a} → {b}" for a, b in arcos])
+        arcos = list(activas)
+        opciones = [f"{inicio} → {fin} ({activas[inicio, fin]})" for inicio, fin in arcos]
+        ruta = self._selector(dialogo, "Ruta", opciones)
 
         def guardar():
             indice = ruta.current()
             if indice == -1:
                 messagebox.showwarning("Faltan datos", "Elige una ruta", parent=dialogo)
                 return
-            self.red.desactivar_ruta(*arcos[indice])
+            inicio, fin = arcos[indice]
+            confirmar = messagebox.askyesno(
+                "Desactivar ruta", f"¿Desactivar {inicio} → {fin}?", parent=dialogo,
+            )
+            if not confirmar:
+                return
+            self.red.desactivar_ruta(inicio, fin)
             dialogo.destroy()
             self.limpiar_resultado()
 
@@ -231,6 +249,80 @@ class Interfaz:
         )
         self.dibujar_red()
         self.actualizar_tabla()
+
+    def guardar_escenario(self):
+        if self.corte is None:
+            messagebox.showinfo(
+                "Escenarios", "Calcula el flujo antes de guardar", parent=self.ventana,
+            )
+            return
+
+        # Guarda como estaba la red al calcular para poder cambiarla despues
+        iniciales = {(inicio, fin): capacidad for inicio, fin, capacidad in RUTAS_INICIALES}
+        activas = self.red.rutas_activas()
+        cambios = []
+        for arco, capacidad in self.red.rutas().items():
+            anterior = iniciales.get(arco)
+            detalle = []
+            if anterior is None:
+                detalle.append(f"nueva ({capacidad})")
+            elif capacidad != anterior:
+                detalle.append(f"{anterior} → {capacidad}")
+            if arco not in activas:
+                detalle.append("inactiva")
+            if detalle:
+                inicio, fin = arco
+                cambios.append(f"{inicio} → {fin}: " + ", ".join(detalle))
+
+        self.escenarios.append((
+            f"{self.origen.get()} → {self.destino.get()}", self.valor.get(),
+            self.corte["capacidad"], len(activas), " | ".join(cambios) or "Red inicial",
+        ))
+        self.comparar_escenarios()
+
+    def comparar_escenarios(self):
+        if not self.escenarios:
+            messagebox.showinfo(
+                "Escenarios", "Guarda un escenario para compararlo", parent=self.ventana,
+            )
+            return
+
+        if self.comparacion is None or not self.comparacion.winfo_exists():
+            ventana = tk.Toplevel(self.ventana)
+            ventana.title("Comparación de escenarios")
+            ventana.geometry("660x260")
+            ventana.transient(self.ventana)
+            ventana.grid_columnconfigure(0, weight=1)
+            ventana.grid_rowconfigure(0, weight=1)
+
+            columnas = ("par", "flujo", "corte", "activas", "cambios")
+            tabla = ttk.Treeview(ventana, columns=columnas, show="headings")
+            for columna, titulo, ancho in (
+                ("par", "Origen y destino", 98), ("flujo", "Flujo máx.", 76),
+                ("corte", "Corte mín.", 76), ("activas", "Rutas activas", 88),
+                ("cambios", "Cambios", 120),
+            ):
+                tabla.heading(columna, text=titulo)
+                anclaje = "w" if columna == "cambios" else "center"
+                tabla.column(columna, width=ancho, anchor=anclaje, stretch=columna == "cambios")
+            vertical = ttk.Scrollbar(ventana, orient="vertical", command=tabla.yview)
+            horizontal = ttk.Scrollbar(ventana, orient="horizontal", command=tabla.xview)
+            tabla.configure(yscrollcommand=vertical.set, xscrollcommand=horizontal.set)
+            tabla.grid(row=0, column=0, sticky="nsew")
+            vertical.grid(row=0, column=1, sticky="ns")
+            horizontal.grid(row=1, column=0, sticky="ew")
+            self.comparacion = ventana
+            self.tabla_escenarios = tabla
+
+        tabla = self.tabla_escenarios
+        tabla.delete(*tabla.get_children())
+        letra = font.nametofont("TkDefaultFont", root=self.comparacion)
+        ancho_cambios = max(letra.measure(escenario[-1]) for escenario in self.escenarios)
+        tabla.column("cambios", minwidth=max(120, ancho_cambios + 20))
+        for escenario in self.escenarios:
+            fila = tabla.insert("", "end", values=escenario)
+        tabla.see(fila)
+        self.comparacion.lift()
 
     def limpiar_resultado(self, evento=None):
         # Si cambia la red hay que calcular de nuevo
