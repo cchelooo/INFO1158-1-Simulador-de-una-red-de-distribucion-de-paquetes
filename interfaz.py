@@ -1,6 +1,12 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import tkinterplus
+import math
+try:
+    from flujo import calcular_flujo_maximo
+except ImportError:
+    calcular_flujo_maximo = None
+from red import Red, CENTROS_INICIALES, RUTAS_INICIALES
 
 # Colores
 FONDO = "#101827"
@@ -63,7 +69,7 @@ def agregar_conexion():
         fg=TEXTO
     ).pack(pady=20)
 
-    centros = list(posiciones.keys())
+    centros = list(red.centros)
 
     # Seleccionar origen
     tk.Label(
@@ -132,61 +138,61 @@ def agregar_conexion():
             return
 
         
-        for u, v, _ in rutas:
-            if u == inicio and v == fin:
+        
+        # Si la ruta existe, comprobar si está desactivada
+        if (
+            (inicio, fin) in red.todas_las_rutas()
+            and not red.ruta_esta_activa(inicio, fin)
+        ):
+            reactivar = messagebox.askyesno(
+                "Ruta desactivada",
+                f"La ruta {inicio} → {fin} está desactivada.\n\n"
+                f"¿Deseas reactivarla con capacidad {capacidad}?",
+                parent=ventana_agregar
+            )
 
-                # Comprobar si la conexión está desactivada
-                if (inicio, fin) in rutas_desactivadas:
-                    reactivar = messagebox.askyesno(
-                        "Ruta desactivada",
-                        f"La ruta {inicio} → {fin} ya existe, "
-                        "pero está desactivada.\n\n"
-                        "¿Deseas reactivarla?",
+            
+            if reactivar:
+                try:
+                    red.modificar_capacidad(inicio, fin, int(capacidad))
+                    red.reactivar_ruta(inicio, fin)
+
+                except ValueError as error:
+                    messagebox.showerror(
+                        "Error al reactivar",
+                        str(error),
                         parent=ventana_agregar
                     )
-
-                    if reactivar:
-                        rutas_desactivadas.remove((inicio, fin))
-                        dibujar_red()
-                        ventana_agregar.destroy()
-
-                        messagebox.showinfo(
-                            "Ruta reactivada",
-                            f"La ruta {inicio} → {fin} "
-                            "fue reactivada correctamente.",
-                            parent=ventana
-                        )
-
                     return
 
-                # La ruta existe y está activa
-                messagebox.showerror(
-                    "Ruta duplicada",
-                    "Esta conexión ya existe y está activa.",
-                    parent=ventana_agregar
-                )
-                return
-
-            if u == fin and v == inicio:
-                messagebox.showerror(
-                    "Conexión recíproca",
-                    "No se permiten conexiones en ambos sentidos.",
-                    parent=ventana_agregar
-                )
-                return
 
 
-            if (u == fin and v == inicio):
-                messagebox.showerror(
-                    "Conexión recíproca",
-                    "No se permiten conexiones en ambos sentidos.",
-                    parent=ventana_agregar
-                )
-                return
+                # Comprobación temporal
+                print(f"Ruta reactivada: {inicio} -> {fin}")
+                print("Rutas activas:", len(red.rutas_activas()))
+                print("¿La ruta sigue activa?",
+                      (inicio, fin) in red.rutas_activas())
 
-        rutas.append((inicio, fin, int(capacidad)))
+                invalidar_resultado()
+                ventana_agregar.destroy()
 
-        dibujar_red()
+            return
+
+        # Registrar la conexión en la clase Red
+        try:
+            red.agregar_ruta(inicio, fin, int(capacidad))
+
+        except ValueError as error:
+            messagebox.showerror(
+                "Conexión inválida",
+                str(error),
+                parent=ventana_agregar
+            )
+            return
+        
+
+
+        invalidar_resultado()
         ventana_agregar.destroy()
 
         messagebox.showinfo(
@@ -224,9 +230,14 @@ def modificar_capacidad():
     ).pack(pady=20)
 
     # Obtener rutas actuales
+    rutas_disponibles = [
+    (inicio, fin, capacidad)
+    for (inicio, fin), capacidad in red.todas_las_rutas().items()
+]
+
     opciones = [
         f"{inicio} → {fin} (Capacidad: {capacidad})"
-        for inicio, fin, capacidad in rutas
+        for inicio, fin, capacidad in rutas_disponibles
     ]
 
     tk.Label(
@@ -269,13 +280,30 @@ def modificar_capacidad():
                 parent=ventana_modificar
             )
             return
-
-        inicio, fin, anterior = rutas[indice]
+        
+        inicio, fin, anterior = rutas_disponibles[indice]
         nueva = int(capacidad)
 
-        rutas[indice] = (inicio, fin, nueva)
+        # Actualizar la capacidad en red.py
+        try:
+            red.modificar_capacidad(inicio, fin, nueva)
 
-        dibujar_red()
+        except ValueError as error:
+            messagebox.showerror(
+                "Capacidad inválida",
+                str(error),
+                parent=ventana_modificar
+            )
+            return
+
+
+
+        # Comprobación temporal
+        print("Capacidad en red.py:",
+              red.todas_las_rutas().get((inicio, fin)))
+
+
+        invalidar_resultado()
         ventana_modificar.destroy()
 
         messagebox.showinfo(
@@ -317,8 +345,7 @@ def desactivar_ruta():
     # Mostrar solamente las rutas activas
     rutas_activas = [
         (inicio, fin, capacidad)
-        for inicio, fin, capacidad in rutas
-        if (inicio, fin) not in rutas_desactivadas
+        for (inicio, fin), capacidad in red.rutas_activas().items()
     ]
 
     opciones = [
@@ -363,8 +390,28 @@ def desactivar_ruta():
         if not confirmar:
             return
 
-        rutas_desactivadas.add((inicio, fin))
-        dibujar_red()
+        
+        # Desactivar la ruta en red.py
+        try:
+            red.desactivar_ruta(inicio, fin)
+
+        except ValueError as error:
+            messagebox.showerror(
+                "Error al desactivar",
+                str(error),
+                parent=ventana_desactivar
+            )
+            return
+
+
+
+        # Comprobación temporal
+        print(f"Ruta desactivada: {inicio} -> {fin}")
+        print("Rutas activas:", len(red.rutas_activas()))
+        print("¿La ruta sigue activa?",
+              (inicio, fin) in red.rutas_activas())
+
+        invalidar_resultado()
         ventana_desactivar.destroy()
 
         messagebox.showinfo(
@@ -383,17 +430,9 @@ def desactivar_ruta():
         font=("Arial", 10, "bold")
     ).pack(pady=25)
 
-    tk.Button(
-        panel_izquierdo,
-        text="Restablecer red",
-        command=restablecer_red,
-        bg="#475569",
-        fg="white",
-        relief="flat",
-        font=("Arial", 10, "bold")
-    ).pack(fill="x", padx=15, pady=(20, 5))
-
 def restablecer_red():
+    global red
+
     confirmar = messagebox.askyesno(
         "Restablecer red",
         "¿Deseas restaurar la red original?\n\n"
@@ -405,21 +444,72 @@ def restablecer_red():
     if not confirmar:
         return
 
-    # Recuperar las conexiones y capacidades originales
-    rutas.clear()
-    rutas.extend(rutas_originales)
+    # Restablecer la red de Marcelo
+    red = Red(CENTROS_INICIALES, RUTAS_INICIALES)
 
-    # Reactivar todas las rutas
-    rutas_desactivadas.clear()
+    # Comprobación en la terminal
+    print("\nRed original restablecida")
+    print("Centros:", len(red.centros))
+    print("Rutas activas en red.py:", len(red.rutas_activas()))
+    print("Rutas en interfaz:", len(red.todas_las_rutas()))
+    print("Rutas desactivadas:", len(red.todas_las_rutas()) - len(red.rutas_activas()))
+    print("Capacidad A -> B:", red.rutas_activas().get(("A", "B")))
 
     # Actualizar la representación gráfica
-    dibujar_red()
+    invalidar_resultado()
 
     messagebox.showinfo(
         "Red restablecida",
         "La red original se restauró correctamente.",
         parent=ventana
     )
+
+resultado = None
+escenarios = []
+
+def invalidar_resultado(event=None):
+    global resultado
+    resultado = None
+    valor_flujo.config(text="—")
+    detalle_corte.config(text="Conjunto S: pendiente\nConjunto T: pendiente")
+    dibujar_red()
+
+def ejecutar_flujo():
+    global resultado
+    if origen.get() == destino.get():
+        messagebox.showwarning("Selección inválida", "Origen y destino deben ser distintos.", parent=ventana)
+        return
+    if calcular_flujo_maximo is None:
+        return
+    try:
+        resultado = calcular_flujo_maximo(red, origen.get(), destino.get())
+        valor_flujo.config(text=str(resultado["valor"]))
+        detalle_corte.config(text="S: " + ", ".join(sorted(resultado["S"])) + "\nT: " + ", ".join(sorted(resultado["T"])) + "\nCapacidad: " + str(resultado["capacidad_corte"]) + "\nArcos: " + ", ".join(f"{a}→{b}" for a,b in resultado["corte"]))
+        dibujar_red()
+    except (ValueError, KeyError, TypeError) as error:
+        invalidar_resultado()
+        messagebox.showerror("Error de cálculo", str(error), parent=ventana)
+
+def guardar_escenario():
+    if resultado is None:
+        messagebox.showinfo("Escenarios", "Calcula el flujo antes de guardar un escenario.", parent=ventana)
+        return
+    escenarios.append((origen.get(), destino.get(), resultado["valor"], resultado["capacidad_corte"], red.todas_las_rutas(), red.rutas_activas()))
+    comparar_escenarios()
+
+def comparar_escenarios():
+    dialogo = tk.Toplevel(ventana)
+    dialogo.title("Comparación de escenarios")
+    tabla = ttk.Treeview(dialogo, columns=("par", "flujo", "corte", "activas", "cambios"), show="headings")
+    for col, titulo in zip(tabla["columns"], ("Origen / destino", "Flujo máximo", "Corte mínimo", "Rutas activas", "Cambios respecto a inicial")):
+        tabla.heading(col, text=titulo)
+        tabla.column(col, width=150 if col != "cambios" else 300)
+    inicial = {(a,b):c for a,b,c in RUTAS_INICIALES}
+    for i,(a,b,f,c,todas,activas) in enumerate(escenarios,1):
+        cambios = [f"{u}→{v}: {inicial.get((u,v), 'nueva')} → {cap}" for (u,v),cap in todas.items() if inicial.get((u,v)) != cap]
+        cambios += [f"{u}→{v}: inactiva" for u,v in todas if (u,v) not in activas]
+        tabla.insert("", "end", values=(f"{i}. {a} → {b}", f,c,len(activas), "; ".join(cambios) or "Original"))
+    tabla.pack(fill="both", expand=True)
 
 # Panel izquierdo
 panel_izquierdo = tk.Frame(contenido, bg=PANEL)
@@ -442,7 +532,7 @@ tk.Label(
 
 origen = ttk.Combobox(
     panel_izquierdo,
-    values=["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+    values=CENTROS_INICIALES,
     state="readonly"
 )
 origen.pack(fill="x", padx=15, pady=(5, 15))
@@ -457,7 +547,7 @@ tk.Label(
 
 destino = ttk.Combobox(
     panel_izquierdo,
-    values=["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+    values=CENTROS_INICIALES,
     state="readonly"
 )
 destino.pack(fill="x", padx=15, pady=(5, 20))
@@ -470,7 +560,8 @@ tk.Button(
     fg=TEXTO,
     relief="flat",
     font=("Arial", 10, "bold"),
-    state="disabled"
+    command=ejecutar_flujo,
+    state="normal" if calcular_flujo_maximo else "disabled"
 ).pack(fill="x", padx=15, pady=5)
 
 tk.Label(
@@ -512,6 +603,18 @@ tk.Button(
     font=("Arial", 10, "bold")
 ).pack(fill="x", padx=15, pady=5)
 
+
+tk.Button(
+    panel_izquierdo,
+    text="Restablecer red",
+    command=restablecer_red,
+    bg="#475569",
+    fg="white",
+    relief="flat",
+    font=("Arial", 10, "bold")
+).pack(fill="x", padx=15, pady=(20, 5))
+
+
 # Panel central
 panel_central = tk.Frame(contenido, bg=PANEL)
 panel_central.grid(row=0, column=1, sticky="nsew", padx=5)
@@ -532,34 +635,12 @@ canvas = tk.Canvas(
 canvas.pack(fill="both", expand=True, padx=15, pady=(0, 15))
 
 
-import math
+# Crear la red utilizando el código de Marcelo
+red = Red(CENTROS_INICIALES, RUTAS_INICIALES)
 
-# Red de demostración: 10 centros y 16 rutas.
-# Formato: (origen, destino, capacidad)
-rutas = [
-    ("A", "B", 8),
-    ("A", "C", 6),
-    ("B", "D", 5),
-    ("B", "E", 4),
-    ("C", "D", 3),
-    ("C", "F", 7),
-    ("D", "E", 4),
-    ("D", "G", 6),
-    ("E", "H", 5),
-    ("F", "G", 8),
-    ("F", "I", 4),
-    ("G", "H", 6),
-    ("G", "I", 3),
-    ("H", "J", 7),
-    ("I", "J", 9),
-    ("E", "I", 2)
-]
-
-# Guardar una copia de la configuración inicial
-rutas_originales = rutas.copy()
-
-# Conjunto de rutas temporalmente desactivadas
-rutas_desactivadas = set()
+print("Red de Marcelo conectada correctamente")
+print("Centros:", len(red.centros))
+print("Rutas activas:", len(red.rutas_activas()))
 
 # Posiciones proporcionales dentro del Canvas
 posiciones = {
@@ -567,10 +648,10 @@ posiciones = {
     "B": (0.28, 0.25),
     "C": (0.28, 0.75),
     "D": (0.47, 0.15),
-    "E": (0.47, 0.40),
+    "E": (0.47, 0.32),
     "F": (0.47, 0.85),
-    "G": (0.67, 0.30),
-    "H": (0.84, 0.20),
+    "G": (0.67, 0.46),
+    "H": (0.82, 0.12),
     "I": (0.67, 0.75),
     "J": (0.92, 0.55)
 }
@@ -592,8 +673,8 @@ def dibujar_red(event=None):
     }
 
     # Dibujar rutas y capacidades
-    for inicio, fin, capacidad in rutas:
-        desactivada = (inicio, fin) in rutas_desactivadas
+    for (inicio, fin), capacidad in red.todas_las_rutas().items():
+        desactivada = not red.ruta_esta_activa(inicio, fin)
         x1, y1 = coordenadas[inicio]
         x2, y2 = coordenadas[fin]
 
@@ -615,7 +696,7 @@ def dibujar_red(event=None):
 
         canvas.create_line(
             sx, sy, ex, ey,
-            fill="#F87171" if desactivada else "#94A3B8",
+            fill="#F87171" if desactivada else ("#F59E0B" if resultado and (inicio, fin) in resultado["corte"] else "#94A3B8"),
             width=3 if desactivada else 2,
             dash=(6, 4) if desactivada else (),
             arrow=tk.LAST,
@@ -623,12 +704,12 @@ def dibujar_red(event=None):
         )
 
         # Etiqueta de capacidad
-        mx = (sx + ex) / 2
-        my = (sy + ey) / 2
+        mx = (sx + ex) / 2 - uy * 12
+        my = (sy + ey) / 2 + ux * 12
 
         canvas.create_text(
-            mx, my - 9,
-            text=str(capacidad),
+            mx, my,
+            text=(f"{resultado['flujos'].get((inicio, fin), 0)}/{capacidad}" if resultado and not desactivada else str(capacidad)),
             fill="#F87171" if desactivada else "#FACC15",
             font=("Arial", 10, "bold")
         )
@@ -659,8 +740,8 @@ def dibujar_red(event=None):
 
 # Actualizar al cambiar tamaño u origen/destino
 canvas.bind("<Configure>", dibujar_red)
-origen.bind("<<ComboboxSelected>>", dibujar_red)
-destino.bind("<<ComboboxSelected>>", dibujar_red)
+origen.bind("<<ComboboxSelected>>", invalidar_resultado)
+destino.bind("<<ComboboxSelected>>", invalidar_resultado)
 
 # Panel derecho
 panel_derecho = tk.Frame(contenido, bg=PANEL)
@@ -681,13 +762,14 @@ tk.Label(
     fg=SECUNDARIO
 ).pack(pady=(15, 5))
 
-tk.Label(
+valor_flujo = tk.Label(
     panel_derecho,
     text="—",
     font=("Arial", 32, "bold"),
     bg=PANEL,
     fg=AZUL
-).pack()
+)
+valor_flujo.pack()
 
 tk.Label(
     panel_derecho,
@@ -704,13 +786,18 @@ tk.Label(
     fg=TEXTO
 ).pack(pady=(40, 15))
 
-tk.Label(
+detalle_corte = tk.Label(
     panel_derecho,
     text="Conjunto S: pendiente\n\nConjunto T: pendiente",
     justify="left",
     bg=PANEL,
-    fg=SECUNDARIO
-).pack(anchor="w", padx=20)
+    fg=SECUNDARIO, wraplength=220
+)
+detalle_corte.pack(anchor="w", padx=20)
+
+tk.Button(panel_derecho, text="Guardar escenario", command=guardar_escenario, bg=AZUL, fg=TEXTO).pack(fill="x", padx=15, pady=(20,5))
+tk.Button(panel_derecho, text="Comparar escenarios", command=comparar_escenarios, bg="#475569", fg=TEXTO).pack(fill="x", padx=15, pady=5)
+tk.Label(panel_derecho, text="Rojo discontinuo: ruta inactiva\nNaranja: corte mínimo\nEtiqueta: flujo/capacidad" if calcular_flujo_maximo else "Algoritmo pendiente de integración", bg=PANEL, fg=SECUNDARIO, wraplength=220).pack(padx=10,pady=10)
 
 # Iniciar aplicación
 ventana.mainloop()
